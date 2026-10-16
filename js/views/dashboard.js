@@ -22,7 +22,7 @@ export function renderDashboard() {
   const hr = new Date().getHours();
   const hello = hr < 6 ? 'Buonanotte' : hr < 13 ? 'Buongiorno' : hr < 18 ? 'Buon pomeriggio' : 'Buonasera';
   const view = h('div', {},
-    h('div', { class: 'welcome' }, h('div', { class: 'muted small' }, new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })), h('h1', {}, `${hello} 👋`)),
+    h('div', { class: 'welcome' }, h('div', { class: 'muted small' }, new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })), h('h1', {}, `${hello}, Stefano`)),
     periodBar());
 
   // primo avvio: guida in 3 passi

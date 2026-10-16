@@ -1,6 +1,6 @@
 // Service worker: l'intera app è in cache, funziona offline al 100%.
 // Quando cambi un file, incrementa VERSION per far scaricare la nuova versione.
-const VERSION = 'mymoney-v11';
+const VERSION = 'mymoney-v12';
 const ASSETS = [
   './', 'index.html', 'manifest.json', 'css/style.css',
   'js/app.js', 'js/ctx.js', 'js/calc.js', 'js/cardpick.js', 'js/gate.js', 'js/chart.js', 'js/db.js', 'js/entry.js', 'js/forms.js', 'js/migrate.js', 'js/money.js', 'js/period.js', 'js/store.js', 'js/ui.js',
