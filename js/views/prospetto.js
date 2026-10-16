@@ -2,7 +2,7 @@
 import { h, backBtn } from '../ui.js';
 import { state } from '../store.js';
 import { ctx, periodBar, catById, currentKey, defaultDateFor } from '../ctx.js';
-import { partials, projection, inheritedBudget } from '../calc.js';
+import { partials, projection, inheritedBudget, fixedStatus } from '../calc.js';
 import { formatEUR, formatShort } from '../money.js';
 import { addPeriods, periodLabel, todayStr } from '../period.js';
 import { barChart } from '../chart.js';
@@ -66,7 +66,7 @@ function periodo() {
     line('Totale entrate', formatEUR(p.income), 'pos tot')));
 
   box.append(h('h2', {}, 'Spese fisse'), h('div', { class: 'card' },
-    p.fixedItems.length ? p.fixedItems.map((x) => line(x.fixed.name, formatEUR(x.amount), x.paid ? 'muted' : '', x.paid ? '✓ pagata' : 'da pagare')) : h('div', { class: 'empty', style: 'padding:14px' }, 'Nessuna spesa fissa attiva'),
+    p.fixedItems.length ? p.fixedItems.map((x) => line(x.fixed.name, formatEUR(x.amount), x.paid ? 'muted' : '', fixedStatus(x, todayStr()).text)) : h('div', { class: 'empty', style: 'padding:14px' }, 'Nessuna spesa fissa attiva'),
     line('Totale fisse', formatEUR(p.fixedTotal), 'tot')));
 
   const cats = [...state.categories.filter((c) => !c.archived || p.byCat[c.id])];

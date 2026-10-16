@@ -44,7 +44,7 @@ export async function init() {
     Object.assign(state.settings, settings);
     state.categories = cats.sort((a, b) => a.order - b.order);
     state.movements = movs; state.incomes = incs; state.fixed = fixed; state.periods = periods;
-    state.paid = Object.fromEntries(paid.map((p) => [p.id, true]));
+    state.paid = Object.fromEntries(paid.map((p) => [p.id, { date: p.date || null }]));
     if (cart) state.cart = cart;
     if (version < SCHEMA_VERSION) await metaSet('schemaVersion', SCHEMA_VERSION);
     // categoria "Altro" per le installazioni precedenti (una sola volta)
@@ -133,8 +133,8 @@ export async function reorderCategories(idsInOrder) {
 }
 
 // ---- spese fisse ----
-export async function addFixed({ name, amount, from }) {
-  const f = { id: uid(), name, order: state.fixed.length, versions: [{ from, active: true, amount }] };
+export async function addFixed({ name, amount, from, dueDay = null }) {
+  const f = { id: uid(), name, order: state.fixed.length, dueDay, versions: [{ from, active: true, amount }] };
   state.fixed.push(f); await db.put('fixed', f); notify(); return f;
 }
 export async function renameFixed(id, name) {
@@ -159,9 +159,14 @@ export async function removeFixedVersion(id, from) {
   f.versions = f.versions.filter((v) => v.from !== from);
   await db.put('fixed', f); notify();
 }
-export async function setPaid(fixedId, key, paid) {
+export async function setDueDay(id, dueDay) {
+  const f = state.fixed.find((x) => x.id === id); f.dueDay = dueDay;
+  await db.put('fixed', f); notify();
+}
+/** Segna pagata (con data di pagamento) o da pagare. */
+export async function setPaid(fixedId, key, paid, date = null) {
   const id = `${fixedId}|${key}`;
-  if (paid) { state.paid[id] = true; await db.put('paid', { id, fixedId, period: key }); }
+  if (paid) { state.paid[id] = { date }; await db.put('paid', { id, fixedId, period: key, date }); }
   else { delete state.paid[id]; await db.del('paid', id); }
   notify();
 }
@@ -178,7 +183,7 @@ export function buildExport() {
     app: 'My Money', schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(),
     settings: state.settings, categories: state.categories, movements: state.movements, incomes: state.incomes,
     fixed: state.fixed, periods: state.periods,
-    paid: Object.keys(state.paid).map((id) => { const [fixedId, period] = id.split('|'); return { id, fixedId, period }; }),
+    paid: Object.keys(state.paid).map((id) => { const [fixedId, period] = id.split('|'); return { id, fixedId, period, date: state.paid[id].date || null }; }),
   };
 }
 export async function markBackup() { await updateSettings({ lastBackup: Date.now() }); }

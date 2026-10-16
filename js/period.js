@@ -113,3 +113,11 @@ export function fmtDMY(dateStr) {
   const { y, m, d } = parseYmd(dateStr);
   return `${pad(d)}/${pad(m)}/${y}`;
 }
+
+/** Data di scadenza (giorno del mese `dueDay`) che cade nel periodo `key`; null se non impostata. Nei mesi corti usa l'ultimo giorno. */
+export function dueDateFor(key, startDay, dueDay) {
+  if (!dueDay) return null;
+  const t = dueDay >= startDay ? parseKey(key) : parseKey(addPeriods(key, 1));
+  const dim = new Date(Date.UTC(t.y, t.m, 0)).getUTCDate();
+  return ymd(t.y, t.m, Math.min(dueDay, dim));
+}

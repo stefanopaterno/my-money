@@ -1,5 +1,5 @@
 // Calcoli puri sullo stato (nessun accesso a DB/DOM): facili da testare.
-import { periodRange, inPeriod, addPeriods, chargeDate, CARD_BANKS } from './period.js';
+import { periodRange, inPeriod, addPeriods, chargeDate, CARD_BANKS, dueDateFor, fmtDMY } from './period.js';
 
 /** Data in cui l'importo pesa sul conto: per le carte è l'addebito, altrimenti la data stessa. */
 export const effDate = (m) => (m.card ? chargeDate(m.date) : m.date);
@@ -52,8 +52,11 @@ export function periodSummary(state, key) {
   for (const f of state.fixed) {
     const amount = fixedAmountAt(f, key);
     if (amount === null) continue;
-    fixedItems.push({ fixed: f, amount, paid: !!state.paid[`${f.id}|${key}`] });
+    const rec = state.paid[`${f.id}|${key}`];
+    fixedItems.push({ fixed: f, amount, paid: !!rec, paidDate: (rec && rec.date) || null, dueDate: dueDateFor(key, startDay, f.dueDay) });
   }
+  // ordine per scadenza (senza data in fondo)
+  fixedItems.sort((a, b) => (a.dueDate && b.dueDate ? (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0) : a.dueDate ? -1 : b.dueDate ? 1 : 0));
   const fixedTotal = fixedItems.reduce((s, x) => s + x.amount, 0);
   const fixedPaid = fixedItems.filter((x) => x.paid).reduce((s, x) => s + x.amount, 0);
 
@@ -117,4 +120,12 @@ export function withVersionOnly(fixed, key, patch) {
   let f = withVersion(fixed, key, patch);
   if (prev && !fixed.versions.some((v) => v.from === next)) f = withVersion(f, next, { active: prev.active, amount: prev.amount });
   return f;
+}
+
+/** Testo di stato di una spesa fissa: "Pagata il 27/09" / "Scade il 17/10" / "Scaduta il 17/10" / "Da pagare". */
+export function fixedStatus(x, today) {
+  const dm = (d) => fmtDMY(d).slice(0, 5);
+  if (x.paid) return { text: x.paidDate ? `Pagata il ${dm(x.paidDate)}` : 'Pagata', cls: 'pos' };
+  if (x.dueDate) return x.dueDate < today ? { text: `Scaduta il ${dm(x.dueDate)}`, cls: 'warn' } : { text: `Scade il ${dm(x.dueDate)}`, cls: 'muted' };
+  return { text: 'Da pagare', cls: 'muted' };
 }

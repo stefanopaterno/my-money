@@ -1,9 +1,9 @@
 import { h, fill, openSheet, askText, confirmSheet, haptic } from '../ui.js';
-import { state, setPaid, addFixed, renameFixed, setFixedFrom, removeFixedVersion } from '../store.js';
-import { ctx, periodBar } from '../ctx.js';
-import { periodSummary, fixedVersionAt } from '../calc.js';
+import { state, setPaid, addFixed, renameFixed, setFixedFrom, removeFixedVersion, setDueDay } from '../store.js';
+import { ctx, periodBar, defaultDateFor } from '../ctx.js';
+import { periodSummary, fixedVersionAt, fixedStatus } from '../calc.js';
 import { formatEUR, parseAmount, centsToInput } from '../money.js';
-import { periodLabel, periodRange, parseKey, MESI } from '../period.js';
+import { periodLabel, periodRange, parseKey, MESI, todayStr, fmtDMY, inPeriod } from '../period.js';
 
 const from = (key) => { const { y, m } = parseKey(key); return `${MESI[m - 1]} ${y}`; };
 
@@ -18,14 +18,35 @@ export function renderFixed() {
   if (!s.fixedItems.length) {
     view.append(h('div', { class: 'empty' }, state.fixed.length ? 'Nessuna spesa fissa attiva in questo periodo.' : 'Non hai ancora spese fisse.', h('br'), 'Aggiungile da “Gestione spese fisse”.'));
   } else {
-    view.append(h('h2', {}, 'In questo periodo'), h('div', { class: 'card' }, s.fixedItems.map((x) =>
-      h('button', { class: 'row', 'aria-pressed': x.paid, onclick: async () => { haptic(); await setPaid(x.fixed.id, key, !x.paid); } },
-        h('div', { class: 'grow' }, h('div', { class: x.paid ? 'muted' : '', style: x.paid ? 'text-decoration:line-through' : '' }, x.fixed.name), h('div', { class: 'small muted' }, x.paid ? 'Pagata' : 'Da pagare')),
+    const today = todayStr();
+    view.append(h('h2', {}, 'In questo periodo'), h('div', { class: 'card' }, s.fixedItems.map((x) => {
+      const st = fixedStatus(x, today);
+      return h('div', { class: 'row fx' },
+        h('button', { class: 'fxmain grow', onclick: () => paySheet(x, key) },
+          h('div', { class: 'ell ' + (x.paid ? 'muted' : '') }, x.fixed.name), h('div', { class: 'small ' + st.cls }, st.text)),
         h('b', { class: 'num' }, formatEUR(x.amount)),
-        h('span', { class: 'sw' + (x.paid ? ' on' : '') })))));
+        h('button', { class: 'swbtn', role: 'switch', 'aria-checked': x.paid, 'aria-label': 'Pagata', onclick: async () => { haptic(); await togglePaid(x, key); } },
+          h('span', { class: 'sw' + (x.paid ? ' on' : '') })));
+    })));
   }
   view.append(h('button', { class: 'btn-primary', onclick: () => manageSheet() }, 'Gestione spese fisse'));
   return view;
+}
+
+const payDefault = (x, key) => (inPeriod(todayStr(), key, state.settings.startDay) ? todayStr() : (x.dueDate || defaultDateFor(key)));
+async function togglePaid(x, key) { await setPaid(x.fixed.id, key, !x.paid, x.paid ? null : payDefault(x, key)); }
+
+/** Dettaglio di una spesa nel periodo: scadenza, data di pagamento, stato. */
+function paySheet(x, key) {
+  const date = h('input', { type: 'date', value: x.paidDate || payDefault(x, key) });
+  const s = openSheet({ title: x.fixed.name });
+  s.body.append(
+    h('div', { class: 'card' },
+      h('div', { class: 'row' }, h('span', { class: 'grow' }, 'Importo'), h('b', { class: 'num' }, formatEUR(x.amount))),
+      h('div', { class: 'row' }, h('span', { class: 'grow' }, 'Scadenza'), h('b', {}, x.dueDate ? fmtDMY(x.dueDate) : 'non impostata')),
+      h('div', { class: 'field' }, h('label', {}, 'Pagata il'), date)),
+    h('button', { class: 'btn-primary', onclick: async () => { await setPaid(x.fixed.id, key, true, date.value || null); haptic(true); s.close(); } }, x.paid ? 'Aggiorna data di pagamento' : 'Segna come pagata'),
+    x.paid && h('button', { class: 'btn-danger', onclick: async () => { await setPaid(x.fixed.id, key, false); s.close(); } }, 'Segna come da pagare'));
 }
 
 function manageSheet() {
@@ -53,9 +74,13 @@ async function newFixed(paint) {
   const v = await askText('Importo mensile', { inputmode: 'decimal', placeholder: '0,00' });
   const amount = v === null ? NaN : parseAmount(v);
   if (Number.isNaN(amount)) return;
-  await addFixed({ name: name.trim(), amount, from: ctx.period });
+  const d = await askText('Giorno di scadenza (1-31, facoltativo)', { inputmode: 'numeric', placeholder: 'es. 27' });
+  if (d === null) return;
+  await addFixed({ name: name.trim(), amount, from: ctx.period, dueDay: dueFrom(d) });
   paint();
 }
+
+const dueFrom = (t) => { const n = parseInt(t, 10); return n >= 1 && n <= 31 ? n : null; };
 
 function itemSheet(id, parentPaint) {
   const s = openSheet({ title: 'Spesa fissa' });
@@ -72,6 +97,10 @@ function itemSheet(id, parentPaint) {
       h('div', { class: 'card' },
         h('button', { class: 'row', onclick: async () => { const n = await askText('Rinomina', { value: f.name }); if (n && n.trim()) { await renameFixed(id, n.trim()); paint(); parentPaint(); } } },
           h('span', { class: 'grow' }, 'Nome'), h('b', {}, f.name), h('span', { class: 'muted' }, '›')),
+        h('button', { class: 'row', onclick: async () => {
+          const d = await askText('Giorno di scadenza (1-31, vuoto = nessuno)', { value: f.dueDay || '', inputmode: 'numeric' });
+          if (d === null) return; await setDueDay(id, dueFrom(d)); paint(); parentPaint();
+        } }, h('span', { class: 'grow' }, 'Scadenza ogni mese'), h('b', {}, f.dueDay ? `giorno ${f.dueDay}` : 'non impostata'), h('span', { class: 'muted' }, '›')),
         h('div', { class: 'row' }, h('span', { class: 'grow' }, 'Nel periodo selezionato'),
           h('b', { class: isActive ? 'num' : 'muted' }, isActive ? formatEUR(v.amount) : 'non attiva'))),
       h('div', { class: 'small muted', style: 'margin:4px 4px' }, `Periodo selezionato: ${when}`),

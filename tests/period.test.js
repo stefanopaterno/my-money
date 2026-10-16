@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  periodKeyForDate, periodRange, periodLabel, chargeDate, addPeriods, daysLeft, diffDays, addDays, clampStartDay, inPeriod,
+  periodKeyForDate, periodRange, periodLabel, chargeDate, dueDateFor, addPeriods, daysLeft, diffDays, addDays, clampStartDay, inPeriod,
 } from '../js/period.js';
 import { formatEUR, parseAmount, keypadPress, keypadToCents } from '../js/money.js';
 import { fixedAmountAt, withVersion, inheritedBudget, periodSummary, partials, projection, budgetSum, withVersionOnly } from '../js/calc.js';
@@ -255,4 +255,15 @@ test('carta di credito: l\'importo pesa nel periodo dell\'addebito', () => {
   assert.equal(ott.cardNext.ING, 500);            // 05/11 addebitato il 10/12
   assert.equal(ott.cardNext.Fineco, 0);
   assert.equal(periodSummary(state, '2026-11').cardCharged.ING, 500);
+});
+
+test('scadenza delle spese fisse dentro il periodo', () => {
+  assert.equal(dueDateFor('2026-09', 27, 27), '2026-09-27'); // giorno di inizio
+  assert.equal(dueDateFor('2026-09', 27, 1), '2026-10-01');  // mese dopo
+  assert.equal(dueDateFor('2026-09', 27, 20), '2026-10-20');
+  assert.equal(dueDateFor('2026-09', 27, 14), '2026-10-14');
+  assert.equal(dueDateFor('2026-12', 27, 5), '2027-01-05');  // cambio d'anno
+  assert.equal(dueDateFor('2027-02', 27, 31), '2027-02-28'); // mese corto
+  assert.equal(dueDateFor('2026-09', 27, null), null);
+  for (let d = 1; d <= 31; d++) assert.ok(inPeriod(dueDateFor('2028-01', 27, d), '2028-01'), `giorno ${d}`);
 });
