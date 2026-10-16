@@ -41,7 +41,7 @@ function paint() {
 
   el.replaceChildren(
     h('div', { class: 'gate-in' },
-      h('div', { class: 'gate-top' }, h('img', { class: 'logo', src: 'icons/icon-192.png', alt: '' }), h('span', { class: 'gate-name' }, 'My Money')),
+      h('div', { class: 'gate-top' }, h('img', { class: 'logo', src: 'icons/icon-192-v2.png', alt: '' }), h('span', { class: 'gate-name' }, 'My Money')),
       h('div', { class: 'gate-hello' }, h('div', { class: 'muted' }, hello + ', Stefano'), h('h1', {}, 'Cosa vuoi fare?')),
       h('div', { class: 'gate-sum' },
         h('div', {}, h('div', { class: 'small', style: 'opacity:.8' }, periodLabel(key, sd)), h('div', { class: 'gate-bal num' }, formatEUR(s.balance))),
