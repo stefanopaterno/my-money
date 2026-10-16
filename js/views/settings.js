@@ -43,7 +43,7 @@ export function importFromCode() {
   s.body.append(h('div', { class: 'card' }, box),
     h('button', { class: 'btn-primary', onclick: async () => {
       try { const data = await decodeImportCode(box.value); s.close(); confirmImport(data); }
-      catch (e) { toast('Codice non valido: ' + e.message, { ms: 4000 }); }
+      catch (e) { toast('Codice non valido: ' + e.message, { ms: 9000 }); }
     } }, 'Continua'),
     h('div', { class: 'small muted center', style: 'margin-top:10px' }, 'Prima di sostituire i dati ti chiedo conferma.'));
   setTimeout(() => box.focus(), 300);

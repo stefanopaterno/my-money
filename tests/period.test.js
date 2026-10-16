@@ -277,4 +277,7 @@ test('codice di importazione: roundtrip e validazione', async () => {
   assert.deepEqual(back, data);
   validate(back);
   await assert.rejects(() => decodeImportCode('ciao'));
+  // testo accodato dopo il punto finale, a capo in mezzo, e troncamento
+  assert.deepEqual(await decodeImportCode(code.slice(0, 30) + '\n' + code.slice(30) + ' Sostituisci con questi dati'), data);
+  await assert.rejects(() => decodeImportCode(code.slice(0, code.length - 30)), /incompleto|incompleti/);
 });
