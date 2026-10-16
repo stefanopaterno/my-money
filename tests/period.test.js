@@ -267,3 +267,14 @@ test('scadenza delle spese fisse dentro il periodo', () => {
   assert.equal(dueDateFor('2026-09', 27, null), null);
   for (let d = 1; d <= 31; d++) assert.ok(inPeriod(dueDateFor('2028-01', 27, d), '2028-01'), `giorno ${d}`);
 });
+
+test('codice di importazione: roundtrip e validazione', async () => {
+  const { encodeImportCode, decodeImportCode } = await import('../js/importcode.js');
+  const data = migrate({ movements: [{ id: 'm1', date: '2026-10-01', amount: 1234, categoryId: 'c' }], fixed: [{ id: 'f', name: 'Mutuo', versions: [{ from: '2026-09', active: true, amount: 80000 }] }] });
+  const code = await encodeImportCode(data);
+  assert.ok(code.startsWith('MM1:'));
+  const back = await decodeImportCode('  testo prima ' + code + '\n ');
+  assert.deepEqual(back, data);
+  validate(back);
+  await assert.rejects(() => decodeImportCode('ciao'));
+});

@@ -1,6 +1,7 @@
 import { h, openSheet, askText, confirmSheet, toast, haptic } from '../ui.js';
 import { state, updateSettings, addCategory, updateCategory, reorderCategories, buildExport, markBackup, importData, wipeAll, seedDemo } from '../store.js';
 import { ctx, currentKey } from '../ctx.js';
+import { decodeImportCode } from '../importcode.js';
 import { clampStartDay, addPeriods, periodRange } from '../period.js';
 import { formatEUR, parseAmount, centsToInput, setMasked } from '../money.js';
 
@@ -23,6 +24,29 @@ export async function exportBackup() {
   } catch (e) {
     if (e.name !== 'AbortError') toast('Esportazione non riuscita: ' + e.message, { ms: 4000 });
   }
+}
+
+function confirmImport(data) {
+  const n = (a) => (Array.isArray(a) ? a.length : 0);
+  confirmSheet('Sovrascrivere i dati?',
+    `Contiene ${n(data.movements)} movimenti e ${n(data.fixed)} spese fisse. TUTTI i dati attuali verranno sostituiti.`,
+    'Sostituisci con questi dati', async () => {
+      try { await importData(data); toast('Dati importati', { ms: 2500 }); ctx.period = currentKey(); ctx.rerender(); }
+      catch (e) { toast('Importazione non riuscita: ' + e.message, { ms: 5000 }); }
+    });
+}
+
+/** Importa incollando un codice (utile quando non si può passare un file all'app installata). */
+export function importFromCode() {
+  const box = h('textarea', { placeholder: 'Incolla qui il codice che inizia con MM1:', rows: 6, style: 'width:100%;border:0;background:transparent;font:14px ui-monospace,monospace;padding:12px;outline:none;color:inherit;resize:none' });
+  const s = openSheet({ title: 'Incolla codice' });
+  s.body.append(h('div', { class: 'card' }, box),
+    h('button', { class: 'btn-primary', onclick: async () => {
+      try { const data = await decodeImportCode(box.value); s.close(); confirmImport(data); }
+      catch (e) { toast('Codice non valido: ' + e.message, { ms: 4000 }); }
+    } }, 'Continua'),
+    h('div', { class: 'small muted center', style: 'margin-top:10px' }, 'Prima di sostituire i dati ti chiedo conferma.'));
+  setTimeout(() => box.focus(), 300);
 }
 
 function importBackup() {
@@ -74,7 +98,8 @@ export function renderSettings() {
   view.append(h('h2', {}, 'Backup'), h('div', { class: 'card' },
     h('div', { class: 'row' }, h('span', { class: 'grow' }, 'Ultimo backup'), h('b', {}, last)),
     h('button', { class: 'row', onclick: exportBackup }, h('span', { class: 'grow', style: 'color:var(--blue)' }, 'Esporta tutti i dati (JSON)')),
-    h('button', { class: 'row', onclick: importBackup }, h('span', { class: 'grow', style: 'color:var(--blue)' }, 'Importa da file JSON'))),
+    h('button', { class: 'row', onclick: importBackup }, h('span', { class: 'grow', style: 'color:var(--blue)' }, 'Importa da file JSON')),
+    h('button', { class: 'row', onclick: importFromCode }, h('span', { class: 'grow', style: 'color:var(--blue)' }, 'Importa incollando un codice'))),
     h('div', { class: 'small muted', style: 'margin:0 16px' }, 'I dati sono solo su questo iPhone. Esporta e salva il file in iCloud Drive / File.'));
 
   const persistRow = h('span', { class: 'muted' }, '…');

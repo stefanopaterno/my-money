@@ -9,7 +9,7 @@ import { partialsCard, cardsCard, prosp } from './prospetto.js';
 import { formatEUR, formatShort, parseAmount, centsToInput } from '../money.js';
 import { daysLeft, nextStartLabel, todayStr, addPeriods } from '../period.js';
 import { editMovement, incomeForm, extraSheet } from '../forms.js';
-import { exportBackup } from './settings.js';
+import { exportBackup, importFromCode } from './settings.js';
 
 const DAY30 = 30 * 86400000;
 
@@ -33,7 +33,8 @@ export function renderDashboard() {
       h('p', { class: 'muted', style: 'margin:4px 0 10px' }, 'Tre passi per partire. I dati restano solo su questo iPhone.'),
       step('1', 'Imposta il tuo stipendio', 'Impostazioni', () => { ctx.tab = 'impostazioni'; ctx.rerender(); }),
       step('2', 'Aggiungi le spese fisse', 'Spese fisse', () => { ctx.tab = 'fisse'; ctx.rerender(); }),
-      step('3', 'Registra la prima spesa', 'Prova', () => openEntry({ onSaved: ctx.rerender }))));
+      step('3', 'Registra la prima spesa', 'Prova', () => openEntry({ onSaved: ctx.rerender })),
+      h('button', { class: 'btn-plain', style: 'margin-top:10px', onclick: importFromCode }, 'Ho un codice di importazione')));
   }
 
   // promemoria backup
