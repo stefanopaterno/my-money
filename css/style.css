@@ -47,7 +47,7 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: v
 
 /* period bar */
 .pbar { display: flex; align-items: center; gap: 4px; margin: 2px -8px 6px; }
-.pbar .nav { width: 44px; height: 44px; font-size: 26px; color: var(--blue); border-radius: 10px; }
+.pbar .nav, .card .row > .nav { width: 44px; height: 44px; font-size: 26px; color: var(--blue); border-radius: 10px; }
 .pbar .lbl { flex: 1; text-align: center; font-weight: 600; font-size: 17px; line-height: 1.15; min-height: 44px; display: grid; place-items: center; }
 .pbar .lbl small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
 .pill { background: var(--fill); border-radius: 999px; padding: 6px 12px; font-size: 14px; min-height: 32px; }

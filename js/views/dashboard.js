@@ -7,11 +7,15 @@ import { openEntry } from '../entry.js';
 import { cardNote, cardIcon } from '../cardpick.js';
 import { partialsCard, cardsCard, prosp } from './prospetto.js';
 import { formatEUR, formatShort, parseAmount, centsToInput } from '../money.js';
-import { daysLeft, nextStartLabel, todayStr, addPeriods } from '../period.js';
+import { daysLeft, nextStartLabel, todayStr, addPeriods, periodKeyForDate, fmtDMY } from '../period.js';
+import { fixedStatus } from '../calc.js';
+import { paySheet, togglePaid } from './fixed.js';
 import { editMovement, incomeForm, extraSheet } from '../forms.js';
 import { exportBackup, importFromCode } from './settings.js';
 
 const DAY30 = 30 * 86400000;
+let daySel = null; // data scelta nella card "Spese del giorno" (null = oggi)
+const shiftDay = (d, n) => { const [y, m, g] = d.split('-').map(Number); const t = new Date(y, m - 1, g + n); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
 
 export function renderDashboard() {
   const key = ctx.period, sd = state.settings.startDay;
@@ -62,6 +66,9 @@ export function renderDashboard() {
       h('button', { onclick: () => { ctx.tab = 'fisse'; ctx.rerender(); } }, h('span', { class: 'small' }, 'Fisse'), h('b', { class: 'num' }, formatShort(s.fixedTotal))),
       h('button', { onclick: () => { ctx.tab = 'movimenti'; ctx.rerender(); } }, h('span', { class: 'small' }, 'Variabili'), h('b', { class: 'num' }, formatShort(s.variableTotal))))));
 
+  // spese del giorno selezionato
+  view.append(h('h2', {}, 'Spese del giorno'), dayCard());
+
   // azioni rapide
   view.append(h('div', { class: 'tiles' },
     tile('🛒', 'Spesa', 'Carrello e prezzi', () => openEntry({ onSaved: ctx.rerender })),
@@ -95,6 +102,49 @@ export function renderDashboard() {
   view.append(h('h2', {}, 'Ultimi periodi'), historyCard(key),
     h('button', { class: 'btn-plain', onclick: () => { ctx.tab = 'prospetto'; prosp.mode = 'cronologia'; ctx.rerender(); } }, 'Cronologia completa e mesi futuri ›'));
   return view;
+}
+
+function dayCard() {
+  const today = todayStr(), date = daySel || today;
+  const key = periodKeyForDate(date, state.settings.startDay);
+  const s = periodSummary(state, key);
+  const fixed = s.fixedItems.filter((x) => x.dueDate === date);
+  const movs = state.movements.filter((m) => m.date === date);
+  const go = (d) => { daySel = d === today ? null : d; ctx.rerender(); };
+  const input = h('input', { type: 'date', value: date, onchange: () => input.value && go(input.value) });
+  const due = fixed.filter((x) => !x.paid).reduce((t, x) => t + x.amount, 0);
+  const card = h('div', { class: 'card' },
+    h('div', { class: 'row' },
+      h('button', { class: 'nav', 'aria-label': 'Giorno precedente', onclick: () => go(shiftDay(date, -1)) }, '‹'),
+      h('div', { class: 'grow center' }, h('b', {}, date === today ? 'Oggi · ' : '', fmtDate(date)), h('div', { class: 'small muted' }, fmtDMY(date))),
+      h('button', { class: 'nav', 'aria-label': 'Giorno successivo', onclick: () => go(shiftDay(date, 1)) }, '›')),
+    h('div', { class: 'row' }, h('span', { class: 'grow muted small' }, 'Vai alla data'), input,
+      date !== today && h('button', { class: 'pill', onclick: () => go(today) }, 'Oggi')));
+  if (fixed.length) {
+    card.append(h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Spese fisse in scadenza'),
+      due > 0 ? h('b', { class: 'num warn' }, `Da pagare ${formatEUR(due)}`) : h('b', { class: 'num pos' }, 'Tutto pagato')));
+    for (const x of fixed) {
+      const st = fixedStatus(x, today);
+      card.append(h('div', { class: 'row fx' },
+        h('button', { class: 'fxmain grow', onclick: () => paySheet(x, key) },
+          h('div', { class: 'ell ' + (x.paid ? 'muted' : '') }, x.fixed.name), h('div', { class: 'small ' + st.cls }, st.text)),
+        h('b', { class: 'num' }, formatEUR(x.amount)),
+        h('button', { class: 'swbtn', role: 'switch', 'aria-checked': x.paid, 'aria-label': 'Pagata', onclick: async () => { haptic(); await togglePaid(x, key); } },
+          h('span', { class: 'sw' + (x.paid ? ' on' : '') }))));
+    }
+  }
+  if (movs.length) {
+    card.append(h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Altre spese'), h('b', { class: 'num' }, formatEUR(movs.reduce((t, m) => t + m.amount, 0)))));
+    for (const m of movs) {
+      const c = catById(m.categoryId);
+      card.append(h('button', { class: 'row', onclick: () => editMovement(m, ctx.rerender) },
+        h('div', { class: 'emo', style: `background:${c.color}22` }, c.emoji),
+        h('div', { class: 'grow' }, h('div', {}, m.note || c.name), m.card && h('div', { class: 'small cardtag' }, cardIcon(), cardNote(m))),
+        h('b', { class: 'num' }, formatEUR(m.amount))));
+    }
+  }
+  if (!fixed.length && !movs.length) card.append(h('div', { class: 'empty' }, 'Nessuna spesa in questa data.'));
+  return card;
 }
 
 const tile = (emoji, title, sub, fn) => h('button', { class: 'tile', onclick: () => { haptic(); fn(); } }, h('span', { class: 'ti' }, emoji), h('b', {}, title), h('span', { class: 'small muted' }, sub));

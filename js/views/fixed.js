@@ -34,10 +34,10 @@ export function renderFixed() {
 }
 
 const payDefault = (x, key) => (inPeriod(todayStr(), key, state.settings.startDay) ? todayStr() : (x.dueDate || defaultDateFor(key)));
-async function togglePaid(x, key) { await setPaid(x.fixed.id, key, !x.paid, x.paid ? null : payDefault(x, key)); }
+export async function togglePaid(x, key) { await setPaid(x.fixed.id, key, !x.paid, x.paid ? null : payDefault(x, key)); }
 
 /** Dettaglio di una spesa nel periodo: scadenza, data di pagamento, stato. */
-function paySheet(x, key) {
+export function paySheet(x, key) {
   const date = h('input', { type: 'date', value: x.paidDate || payDefault(x, key) });
   const s = openSheet({ title: x.fixed.name });
   s.body.append(
