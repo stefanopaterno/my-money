@@ -117,7 +117,7 @@ export function plannedForm(item, key, catId, onDone) {
       if (item) await updatePlanned(item.id, data); else await addPlanned(data);
       haptic(true); s.close(); onDone && onDone();
     } }, 'Salva'),
-    item && h('button', { class: 'btn-danger', onclick: async () => { await deletePlanned(item.id); s.close(); onDone && onDone(); } }, 'Elimina previsione')] });
+    item && h('button', { class: 'btn-danger', onclick: async () => { await deletePlanned(item.id); s.close(); onDone && onDone(); } }, 'Elimina previsione')].filter(Boolean) });
   setTimeout(() => amount.focus(), 350);
 }
 
