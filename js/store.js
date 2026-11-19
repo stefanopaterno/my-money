@@ -12,7 +12,7 @@ export const DEFAULT_CATEGORIES = [
 
 export const state = {
   settings: { startDay: 27, salaryDefault: 0, createdAt: null, lastBackup: null, showGate: true, privacyOnOpen: true, lastBank: 'ING' },
-  categories: [], movements: [], incomes: [], fixed: [],
+  categories: [], movements: [], incomes: [], fixed: [], planned: [], // planned: [{id,date,amount,categoryId,note}]
   periods: [], // [{key, salary?, budgets:{catId:cents}}]
   paid: {},    // 'fixedId|periodKey' -> true
   cart: { items: [], categoryId: null, note: '' },
@@ -28,9 +28,9 @@ async function metaGet(key) { const r = await db.get('meta', key); return r ? r.
 const metaSet = (key, value) => db.put('meta', { key, value });
 
 export async function init() {
-  const [settings, cart, version, cats, movs, incs, fixed, periods, paid] = await Promise.all([
+  const [settings, cart, version, cats, movs, incs, fixed, periods, paid, planned] = await Promise.all([
     metaGet('settings'), metaGet('cart'), metaGet('schemaVersion'),
-    db.all('categories'), db.all('movements'), db.all('incomes'), db.all('fixed'), db.all('periods'), db.all('paid'),
+    db.all('categories'), db.all('movements'), db.all('incomes'), db.all('fixed'), db.all('periods'), db.all('paid'), db.all('planned'),
   ]);
   if (version === undefined) {
     // primo avvio: categorie predefinite
@@ -43,7 +43,7 @@ export async function init() {
   } else {
     Object.assign(state.settings, settings);
     state.categories = cats.sort((a, b) => a.order - b.order);
-    state.movements = movs; state.incomes = incs; state.fixed = fixed; state.periods = periods;
+    state.movements = movs; state.incomes = incs; state.fixed = fixed; state.periods = periods; state.planned = planned;
     state.paid = Object.fromEntries(paid.map((p) => [p.id, { date: p.date || null }]));
     if (cart) state.cart = cart;
     if (version < SCHEMA_VERSION) await metaSet('schemaVersion', SCHEMA_VERSION);
@@ -83,6 +83,20 @@ export async function updateMovement(id, patch) {
 export async function deleteMovement(id) {
   state.movements = state.movements.filter((x) => x.id !== id);
   await db.del('movements', id); notify();
+}
+
+// ---- previsionali (voci previste con data) ----
+export async function addPlanned({ date, amount, categoryId, note = '' }) {
+  const p = { id: uid(), date, amount, categoryId, note };
+  state.planned.push(p); await db.put('planned', p); notify(); return p;
+}
+export async function updatePlanned(id, patch) {
+  const p = state.planned.find((x) => x.id === id); Object.assign(p, patch);
+  await db.put('planned', p); notify();
+}
+export async function deletePlanned(id) {
+  state.planned = state.planned.filter((x) => x.id !== id);
+  await db.del('planned', id); notify();
 }
 
 // ---- entrate extra ----
@@ -182,7 +196,7 @@ export function buildExport() {
   return {
     app: 'My Money', schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(),
     settings: state.settings, categories: state.categories, movements: state.movements, incomes: state.incomes,
-    fixed: state.fixed, periods: state.periods,
+    fixed: state.fixed, periods: state.periods, planned: state.planned,
     paid: Object.keys(state.paid).map((id) => { const [fixedId, period] = id.split('|'); return { id, fixedId, period, date: state.paid[id].date || null }; }),
   };
 }
@@ -191,7 +205,7 @@ export async function markBackup() { await updateSettings({ lastBackup: Date.now
 export async function importData(raw) {
   const d = validate(migrate(raw));
   await db.replace({
-    categories: d.categories, movements: d.movements, incomes: d.incomes, fixed: d.fixed, periods: d.periods, paid: d.paid,
+    categories: d.categories, movements: d.movements, incomes: d.incomes, fixed: d.fixed, periods: d.periods, paid: d.paid, planned: d.planned,
     meta: [
       { key: 'settings', value: { startDay: 27, salaryDefault: 0, createdAt: Date.now(), lastBackup: null, showGate: true, privacyOnOpen: true, lastBank: 'ING', ...d.settings } },
       { key: 'schemaVersion', value: SCHEMA_VERSION },
@@ -210,7 +224,7 @@ async function reloadFromDb() {
 
 export async function wipeAll() {
   await db.clearAll();
-  state.categories = []; state.movements = []; state.incomes = []; state.fixed = []; state.periods = []; state.paid = {};
+  state.categories = []; state.movements = []; state.incomes = []; state.fixed = []; state.periods = []; state.planned = []; state.paid = {};
   await reloadFromDb();
 }
 

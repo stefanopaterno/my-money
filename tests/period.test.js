@@ -281,3 +281,44 @@ test('codice di importazione: roundtrip e validazione', async () => {
   assert.deepEqual(await decodeImportCode(code.slice(0, 30) + '\n' + code.slice(30) + ' Sostituisci con questi dati'), data);
   await assert.rejects(() => decodeImportCode(code.slice(0, code.length - 30)), /incompleto|incompleti/);
 });
+
+// ---- monthPlan ----
+import { monthPlan } from '../js/calc.js';
+test('monthPlan: il previsto si consuma man mano che si spende', () => {
+  const state = {
+    settings: { startDay: 27, salaryDefault: 200000 },
+    categories: [{ id: 'a', name: 'Cibo' }, { id: 'b', name: 'Auto' }, { id: 'c', name: 'Altro' }],
+    movements: [
+      { id: '1', date: '2025-10-28', amount: 6000, categoryId: 'a' },
+      { id: '2', date: '2025-10-29', amount: 20000, categoryId: 'b' },
+      { id: '3', date: '2025-10-30', amount: 1000, categoryId: 'c' },
+    ],
+    incomes: [], fixed: [{ id: 'f', name: 'Mutuo', versions: [{ from: '2025-10', active: true, amount: 50000 }] }],
+    paid: {}, periods: [{ key: '2025-10', budgets: { a: 15000, b: 15000 } }],
+  };
+  const p = monthPlan(state, '2025-10');
+  assert.equal(p.planned.length, 2);
+  assert.equal(p.planned[0].left, 9000);
+  assert.equal(p.planned[1].over, 5000);           // sforato
+  assert.equal(p.otherSpent, 1000);                 // categoria senza budget
+  assert.equal(p.committed, 50000 + 15000 + 20000 + 1000);
+  assert.equal(p.forecastBalance, 200000 - p.committed);
+});
+
+test('monthPlan: le previsioni con data valgono solo nel loro periodo e prevalgono sul budget', () => {
+  const state = {
+    settings: { startDay: 27, salaryDefault: 100000 },
+    categories: [{ id: 'a', name: 'Cibo' }], movements: [{ id: '1', date: '2025-11-05', amount: 4000, categoryId: 'a' }],
+    incomes: [], fixed: [], paid: {}, periods: [{ key: '2025-10', budgets: { a: 99999 } }],
+    planned: [{ id: 'p', date: '2025-11-26', amount: 15000, categoryId: 'a', note: '' }, { id: 'q', date: '2025-12-26', amount: 7000, categoryId: 'a', note: '' }],
+  };
+  const nov = monthPlan(state, '2025-10'); // 27 ott - 26 nov: contiene la previsione del 26/11
+  assert.equal(nov.planned[0].budget, 15000);
+  assert.equal(nov.planned[0].left, 11000);
+  const dic = monthPlan(state, '2025-11'); // 27 nov - 26 dic
+  assert.equal(dic.planned[0].budget, 7000);
+});
+test('migrazione v1 -> v2 aggiunge planned', () => {
+  const d = migrate({ schemaVersion: 1, categories: [], movements: [], incomes: [], fixed: [], periods: [], paid: [] });
+  assert.deepEqual(d.planned, []); assert.equal(d.schemaVersion, 2);
+});

@@ -5,7 +5,8 @@ import { periodSummary, inheritedBudget } from '../calc.js';
 import { barChart } from '../chart.js';
 import { openEntry } from '../entry.js';
 import { cardNote, cardIcon } from '../cardpick.js';
-import { partialsCard, cardsCard, prosp } from './prospetto.js';
+import { cardsCard, prosp } from './prospetto.js';
+import { monthOverview, plannedForm } from './month.js';
 import { formatEUR, formatShort, parseAmount, centsToInput } from '../money.js';
 import { daysLeft, nextStartLabel, todayStr, addPeriods, periodKeyForDate, fmtDMY } from '../period.js';
 import { fixedStatus } from '../calc.js';
@@ -66,38 +67,20 @@ export function renderDashboard() {
       h('button', { onclick: () => { ctx.tab = 'fisse'; ctx.rerender(); } }, h('span', { class: 'small' }, 'Fisse'), h('b', { class: 'num' }, formatShort(s.fixedTotal))),
       h('button', { onclick: () => { ctx.tab = 'movimenti'; ctx.rerender(); } }, h('span', { class: 'small' }, 'Variabili'), h('b', { class: 'num' }, formatShort(s.variableTotal))))));
 
-  // spese del giorno selezionato
-  view.append(h('h2', {}, 'Spese del giorno'), dayCard());
+  // il mese: totali + aree fisse / previsionali / altre variabili
+  view.append(h('h2', {}, 'Il mese'), monthOverview(key, categorySheet));
 
   // azioni rapide
-  view.append(h('div', { class: 'tiles' },
+  view.append(h('div', { class: 'tiles', style: 'margin-top:16px' },
     tile('🛒', 'Spesa', 'Carrello e prezzi', () => openEntry({ onSaved: ctx.rerender })),
     tile('💶', 'Entrata extra', 'Rimborso, bonus…', () => extraSheet('in', defaultDateFor(key), ctx.rerender)),
     tile('💸', 'Uscita extra', 'Una tantum', () => extraSheet('out', defaultDateFor(key), ctx.rerender)),
     tile('📈', 'Prospetto', 'E mesi futuri', () => { ctx.tab = 'prospetto'; prosp.mode = 'cronologia'; ctx.rerender(); })));
 
-  // parziali del periodo corrente
-  if (key === cur) view.append(h('h2', {}, 'Parziali di oggi'), partialsCard(key));
-  const cc = cardsCard(key); if (cc) view.append(h('h2', {}, 'Carte di credito'), cc);
+  // spese del giorno selezionato
+  view.append(h('h2', {}, 'Spese del giorno'), dayCard());
 
-  // categorie
-  const cats = state.categories.filter((c) => !c.archived || s.byCat[c.id]);
-  const orphan = Object.keys(s.byCat).filter((id) => !state.categories.some((c) => c.id === id)).map(catById);
-  view.append(h('h2', {}, 'Categorie'));
-  const list = h('div', { class: 'card' });
-  for (const c of [...cats, ...orphan]) {
-    const spent = s.byCat[c.id] || 0, budget = inheritedBudget(state.periods, key, c.id);
-    const pct = budget > 0 ? spent / budget : 0;
-    const cls = pct > 1 ? 'r' : pct > 0.8 ? 'o' : '';
-    list.append(h('button', { class: 'row', style: 'align-items:stretch', onclick: () => categorySheet(c, key) },
-      h('div', { class: 'emo', style: `background:${c.color}22;align-self:center` }, c.emoji),
-      h('div', { class: 'grow' },
-        h('div', { style: 'display:flex;justify-content:space-between;gap:8px' },
-          h('span', { class: 'ell' }, c.name + (c.archived ? ' (archiviata)' : '')),
-          h('span', { class: 'num ' + (pct > 1 ? 'neg' : '') }, formatShort(spent), h('span', { class: 'muted small' }, budget ? ` / ${formatShort(budget)}` : ''))),
-        h('div', { class: 'bar' }, h('i', { class: cls, style: `width:${budget ? Math.min(100, pct * 100) : 0}%` })))));
-  }
-  view.append(list);
+  const cc = cardsCard(key); if (cc) view.append(h('h2', {}, 'Carte di credito'), cc);
 
   view.append(h('h2', {}, 'Ultimi periodi'), historyCard(key),
     h('button', { class: 'btn-plain', onclick: () => { ctx.tab = 'prospetto'; prosp.mode = 'cronologia'; ctx.rerender(); } }, 'Cronologia completa e mesi futuri ›'));
@@ -168,6 +151,7 @@ function categorySheet(cat, key) {
     const sum = periodSummary(state, key);
     const movs = sum.movements.filter((m) => m.categoryId === cat.id);
     const budget = inheritedBudget(state.periods, key, cat.id);
+    const plan = state.planned.filter((x) => x.categoryId === cat.id && x.date >= sum.range.start && x.date < sum.range.endExcl).sort((a, b) => (a.date < b.date ? -1 : 1));
     fill(s.body, 
       h('div', { class: 'card' },
         h('button', { class: 'row', onclick: async () => {
@@ -178,7 +162,12 @@ function categorySheet(cat, key) {
           await setBudget(key, cat.id, c); paint();
         } }, h('span', { class: 'grow' }, 'Budget del periodo'), h('b', { class: 'num' }, formatEUR(budget)), h('span', { class: 'muted' }, '›')),
         h('div', { class: 'row' }, h('span', { class: 'grow' }, 'Speso'), h('b', { class: 'num' }, formatEUR(sum.byCat[cat.id] || 0)))),
-      h('div', { class: 'small muted', style: 'margin:-4px 16px 8px' }, 'Il budget vale anche per i periodi successivi finché non lo cambi.'),
+      h('div', { class: 'small muted', style: 'margin:-4px 16px 8px' }, 'Il budget vale anche per i periodi successivi finché non lo cambi. Se inserisci previsioni con data, valgono quelle.'),
+      h('h2', {}, 'Previsioni del periodo'),
+      h('div', { class: 'card' },
+        plan.map((x) => h('button', { class: 'row', onclick: () => plannedForm(x, key, cat.id, paint) },
+          h('div', { class: 'grow' }, h('div', {}, x.note || 'Previsione'), h('div', { class: 'small muted' }, fmtDate(x.date))), h('b', { class: 'num' }, formatEUR(x.amount)))),
+        h('button', { class: 'row addrow', onclick: () => plannedForm(null, key, cat.id, paint) }, '＋ Aggiungi previsione')),
       h('h2', {}, `Movimenti (${movs.length})`),
       movs.length ? h('div', { class: 'card' }, movs.map((m) => h('button', { class: 'row', onclick: () => editMovement(m, paint) },
         h('div', { class: 'grow' }, h('div', {}, m.note || cat.name), h('div', { class: 'small muted' }, fmtDate(m.date)), m.card && h('div', { class: 'small cardtag' }, cardIcon(), cardNote(m))),

@@ -129,3 +129,38 @@ export function fixedStatus(x, today) {
   if (x.dueDate) return x.dueDate < today ? { text: `Scaduta il ${dm(x.dueDate)}`, cls: 'warn' } : { text: `Scade il ${dm(x.dueDate)}`, cls: 'muted' };
   return { text: 'Da pagare', cls: 'muted' };
 }
+
+/**
+ * Visione d'insieme del periodo in tre aree:
+ *  - fisse (pagate / da pagare)
+ *  - previsionali: categorie con budget > 0; il previsto si "consuma" man mano che si spende
+ *  - altre variabili: spese in categorie senza budget
+ * `committed` = quanto il periodo impegna: fisse + max(speso, previsto) per ogni previsionale + altre variabili.
+ */
+export function monthPlan(state, key) {
+  const s = periodSummary(state, key);
+  // previsioni con data dentro il periodo; se una categoria non ne ha, vale il budget ereditato (dati storici)
+  const items = (state.planned || []).filter((x) => x.date >= s.range.start && x.date < s.range.endExcl);
+  const cats = state.categories.filter((c) => !c.archived || s.byCat[c.id] || items.some((x) => x.categoryId === c.id));
+  const planned = [], other = [];
+  for (const c of cats) {
+    const spent = s.byCat[c.id] || 0;
+    const its = items.filter((x) => x.categoryId === c.id).sort((a, b) => (a.date < b.date ? -1 : 1));
+    const budget = its.length ? its.reduce((t, x) => t + x.amount, 0) : inheritedBudget(state.periods, key, c.id);
+    if (budget > 0) planned.push({ cat: c, spent, budget, items: its, left: budget - spent, over: Math.max(0, spent - budget) });
+    else if (spent > 0) other.push({ cat: c, spent });
+  }
+  // movimenti in categorie ormai inesistenti
+  for (const id of Object.keys(s.byCat)) {
+    if (!cats.some((c) => c.id === id) && s.byCat[id] > 0) other.push({ cat: { id, name: 'Categoria eliminata', emoji: '❔', color: '#8e8e93' }, spent: s.byCat[id] });
+  }
+  const plannedBudget = planned.reduce((t, p) => t + p.budget, 0);
+  const plannedSpent = planned.reduce((t, p) => t + p.spent, 0);
+  const plannedCommitted = planned.reduce((t, p) => t + Math.max(p.spent, p.budget), 0);
+  const otherSpent = other.reduce((t, p) => t + p.spent, 0);
+  const committed = s.fixedTotal + plannedCommitted + otherSpent;
+  return {
+    summary: s, planned, other, plannedBudget, plannedSpent, plannedCommitted, otherSpent,
+    committed, forecastBalance: s.income - committed,
+  };
+}

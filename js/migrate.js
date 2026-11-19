@@ -1,5 +1,5 @@
 // Schema dei dati: ogni modifica futura aggiunge un passo in MIGRATIONS e incrementa SCHEMA_VERSION.
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const MIGRATIONS = {
   // v0 (file senza versione) -> v1: riempie i campi mancanti.
@@ -14,6 +14,8 @@ const MIGRATIONS = {
     paid: d.paid || [],
     schemaVersion: 1,
   }),
+  // v1 -> v2: voci previste (previsionali) con data
+  1: (d) => ({ ...d, planned: d.planned || [], schemaVersion: 2 }),
 };
 
 export function migrate(data) {
@@ -31,6 +33,8 @@ export function migrate(data) {
 export function validate(d) {
   const arrays = ['categories', 'movements', 'incomes', 'fixed', 'periods', 'paid'];
   for (const k of arrays) if (!Array.isArray(d[k])) throw new Error(`Campo "${k}" mancante`);
+  if (d.planned === undefined) d.planned = [];
+  if (!Array.isArray(d.planned) || !d.planned.every((m) => m.id && /^\d{4}-\d{2}-\d{2}$/.test(m.date) && Number.isInteger(m.amount))) throw new Error('Previsionali non validi');
   const intOk = (n) => Number.isInteger(n);
   if (!d.movements.every((m) => m.id && /^\d{4}-\d{2}-\d{2}$/.test(m.date) && intOk(m.amount))) throw new Error('Movimenti non validi');
   if (!d.incomes.every((m) => m.id && /^\d{4}-\d{2}-\d{2}$/.test(m.date) && intOk(m.amount))) throw new Error('Entrate non valide');

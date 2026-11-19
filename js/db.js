@@ -1,9 +1,9 @@
 // Piccolo wrapper promise-based su IndexedDB.
 const DB_NAME = 'budget27';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 // store -> keyPath
 export const STORES = {
-  meta: 'key', categories: 'id', movements: 'id', incomes: 'id', fixed: 'id', periods: 'key', paid: 'id',
+  meta: 'key', categories: 'id', movements: 'id', incomes: 'id', fixed: 'id', periods: 'key', paid: 'id', planned: 'id',
 };
 
 let dbp = null;
