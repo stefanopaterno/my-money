@@ -111,7 +111,7 @@ export function plannedForm(item, key, catId, onDone) {
       if (categoryId === NEW) {
         const n = newName.value.trim(); if (!n) { newName.focus(); return; }
         const ex = state.categories.find((x) => !x.archived && x.name.trim().toLowerCase() === n.toLowerCase());
-        categoryId = (ex || await addCategory({ name: n, emoji: '🎯', color: COLORS[state.categories.length % COLORS.length] })).id;
+        categoryId = (ex || await addCategory({ name: n, emoji: '🏷️', color: COLORS[state.categories.length % COLORS.length] })).id;
       }
       const data = { date: date.value, amount: c, categoryId, note: note.value.trim() };
       if (item) await updatePlanned(item.id, data); else await addPlanned(data);

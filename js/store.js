@@ -5,7 +5,7 @@ import { withVersion, withVersionOnly } from './calc.js';
 import { todayStr, addDays } from './period.js';
 
 export const DEFAULT_CATEGORIES = [
-  ['Spesa cibo', '🛒', '#34c759'], ['Cene', '🍽️', '#ff9500'], ['Spese mediche', '💊', '#ff3b30'],
+  ['Spesa cibo', '🛒', '#34c759'], ['Ricarica auto', '⚡', '#30d158'], ['Cene', '🍽️', '#ff9500'], ['Spese mediche', '💊', '#ff3b30'],
   ['Spese casa', '🏠', '#8e6e53'], ['Spese personali', '🧴', '#af52de'], ['Vestiti', '👕', '#5856d6'],
   ['Elettricità', '💡', '#ffcc00'], ['Gas', '🔥', '#ff6b35'], ['ADSL', '🌐', '#30b0c7'], ['Telefono', '📱', '#007aff'], ['Altro', '📦', '#8e8e93'],
 ];
@@ -40,6 +40,7 @@ export async function init() {
     await metaSet('settings', state.settings);
     await metaSet('schemaVersion', SCHEMA_VERSION);
     await metaSet('altroSeeded', true);
+    await metaSet('ricaricaSeeded', true);
   } else {
     Object.assign(state.settings, settings);
     state.categories = cats.sort((a, b) => a.order - b.order);
@@ -47,6 +48,14 @@ export async function init() {
     state.paid = Object.fromEntries(paid.map((p) => [p.id, { date: p.date || null }]));
     if (cart) state.cart = cart;
     if (version < SCHEMA_VERSION) await metaSet('schemaVersion', SCHEMA_VERSION);
+    // categoria "Ricarica auto" per le installazioni precedenti (una sola volta)
+    if (!(await metaGet('ricaricaSeeded'))) {
+      if (!state.categories.some((c) => c.name.trim().toLowerCase() === 'ricarica auto')) {
+        const c = { id: uid(), name: 'Ricarica auto', emoji: '⚡', color: '#30d158', order: state.categories.length, archived: false };
+        state.categories.push(c); await db.put('categories', c);
+      }
+      await metaSet('ricaricaSeeded', true);
+    }
     // categoria "Altro" per le installazioni precedenti (una sola volta)
     if (!(await metaGet('altroSeeded'))) {
       if (!state.categories.some((c) => c.name === 'Altro')) {

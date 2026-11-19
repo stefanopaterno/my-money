@@ -88,7 +88,7 @@ export function renderSettings() {
     toggleRow('Schermata iniziale', 'Chiede subito cosa vuoi fare', st.showGate, (v) => updateSettings({ showGate: v }).then(ctx.rerender))));
 
   const active = state.categories.filter((c) => !c.archived), arch = state.categories.filter((c) => c.archived);
-  view.append(h('h2', {}, 'Categorie (trascina ≡ per riordinare)'));
+  view.append(h('h2', {}, 'Categorie (trascina ≡ per riordinare)'), h('div', { class: 'small muted', style: 'margin:0 16px 6px' }, 'Tocca una categoria per cambiare nome, icona e colore o archiviarla. Le nuove partono con l\'icona 🏷️.'));
   const list = h('div', { class: 'card', id: 'catlist' }, active.map((c) => catRow(c)));
   view.append(list, h('button', { class: 'btn-plain', onclick: () => catForm(null) }, '+ Nuova categoria'));
   if (arch.length) view.append(h('h2', {}, 'Archiviate'), h('div', { class: 'card' }, arch.map((c) =>
